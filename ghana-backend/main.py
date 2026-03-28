@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import asyncio
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from ml.model_trainer import train_all_models
 from routers import (auth, costs, anomalies, alerts, 

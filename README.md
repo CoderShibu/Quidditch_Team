@@ -33,23 +33,45 @@ Ghana Cloud Guard is a production-grade, AI-powered **AWS Cloud Cost Intelligenc
 
 ## 🏎 Quick Start
 
-### 1. Start the API Server
+### 1. Setup Backend Environment Variables
+
+Create a `.env` file inside the `ghana-backend/` folder and add your API keys:
+```env
+GROQ_API_KEY=your_groq_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+### 2. Start the API Server
 
 ```bash
 cd ghana-backend
+
+# On Windows (Recommended)
+.\run_backend.ps1
+
+# Alternative Manual (Linux/macOS)
 python -m venv venv
-source venv/bin/activate  # On Windows: .\venv\Scripts\Activate.ps1
+source venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-### 2. Start the Client Application
+### 3. Start the Client Application
 
 ```bash
 # In the root repository directory
 npm install
 npm run dev
 ```
+
+### 4. Access the Dashboard
+
+Navigate to `http://localhost:8080/` in your browser.
+Use the following demo credentials to securely log in:
+- **Username / Email**: `Quidditch`
+- **Password**: `Team`
+
+> **Offline Fallback Mode:** The frontend is equipped with a robust offline mock data layer. If your backend is offline, or your API keys are invalid, the UI will seamlessly switch to locally generated fallback data so you can continue the demo without interruption!
 
 ## 🧠 The "Ghana AI" Agent
 Our agent actively intercepts and analyzes real-time AWS CloudTrail/CostExplorer mock-streams. Using Llama 3 70B, it translates raw JSON traces (e.g., `i-0a1b2c3d idle time`) into actionable, 1-click optimization commands directly in the centralized Command Center.

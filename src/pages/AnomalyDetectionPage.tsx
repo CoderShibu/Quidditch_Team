@@ -380,7 +380,7 @@ export default function AnomalyDetectionPage() {
       <div className="glass rounded-lg p-6 border border-border mt-8">
         <h3 className="font-display font-bold text-sm mb-4 text-foreground">Anomaly Trend (14 Days)</h3>
         <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={anomalyTrendData}>
+          <BarChart data={trendData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#460000" vertical={false} />
             <XAxis dataKey="date" tick={{ fill: 'hsl(0 25% 65%)', fontSize: 10 }} axisLine={{ stroke: '#460000' }} tickLine={false} />
             <YAxis tick={{ fill: 'hsl(0 25% 65%)', fontSize: 10 }} axisLine={false} tickLine={false} />

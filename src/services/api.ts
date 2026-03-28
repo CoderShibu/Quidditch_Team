@@ -1,3 +1,5 @@
+import { mockData } from './mockData';
+
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 const getHeaders = () => ({
@@ -5,170 +7,232 @@ const getHeaders = () => ({
   'Authorization': `Bearer ${localStorage.getItem('ghana_token')}`
 })
 
-// For simple endpoints that wrap everything under "data"
-const handleResponse = async (res: Response) => {
-  if (!res.ok) throw new Error(`API Error: ${res.status}`)
+const handleResponse = async (res: Response, fallbackKey?: keyof typeof mockData) => {
+  if (!res.ok) {
+    if (fallbackKey && mockData[fallbackKey]) return mockData[fallbackKey];
+    throw new Error(`API Error: ${res.status}`)
+  }
   const json = await res.json()
   return json.data ?? json
 }
 
-// For endpoints that return extra fields alongside "data" (costs, etc.)
-const handleFullResponse = async (res: Response) => {
-  if (!res.ok) throw new Error(`API Error: ${res.status}`)
+const handleFullResponse = async (res: Response, fallbackKey?: keyof typeof mockData) => {
+  if (!res.ok) {
+    if (fallbackKey && mockData[fallbackKey]) return mockData[fallbackKey];
+    throw new Error(`API Error: ${res.status}`)
+  }
   return res.json()
+}
+
+const withFallback = async (
+  fetchPromise: Promise<Response>, 
+  handler: Function, 
+  fallbackKey?: keyof typeof mockData
+) => {
+  try {
+    const res = await fetchPromise;
+    return await handler(res, fallbackKey);
+  } catch (error) {
+    if (fallbackKey && mockData[fallbackKey]) {
+      console.warn(`[Ghana Offline Mode] API failed, using fallback data for: ${fallbackKey}`);
+      return mockData[fallbackKey];
+    }
+    throw error;
+  }
 }
 
 export const api = {
   // AUTH
   login: (username: string, password: string) =>
-    fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({username, password})
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/auth/login`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password})
+      }), handleResponse
+    ),
 
   signup: (data: object) =>
-    fetch(`${API_BASE}/auth/signup`, {
-      method: 'POST', 
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(data)
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/auth/signup`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+      }), handleResponse
+    ),
 
-  // COSTS — returns {data[], predictions[], totalCost, moneySaved, budget, mlAnomaly}
+  // COSTS
   getCosts: (range = 30) =>
-    fetch(`${API_BASE}/costs/?range=${range}`, 
-      {headers: getHeaders()}).then(handleFullResponse),
+    withFallback(
+      fetch(`${API_BASE}/costs/?range=${range}`, {headers: getHeaders()}),
+      handleFullResponse, 'costsData'
+    ),
 
   getSummary: () =>
-    fetch(`${API_BASE}/costs/summary`, 
-      {headers: getHeaders()}).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/costs/summary`, {headers: getHeaders()}),
+      handleResponse, 'summaryData'
+    ),
 
   getBurnRate: () =>
-    fetch(`${API_BASE}/costs/burn-rate`, 
-      {headers: getHeaders()}).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/costs/burn-rate`, {headers: getHeaders()}),
+      handleResponse, 'burnRateData'
+    ),
 
   // ANOMALIES
   getAnomalies: (filters: Record<string, string> = {}) => {
     const params = new URLSearchParams(filters).toString()
-    return fetch(`${API_BASE}/anomalies/?${params}`, 
-      {headers: getHeaders()}).then(handleResponse)
+    return withFallback(
+      fetch(`${API_BASE}/anomalies/?${params}`, {headers: getHeaders()}),
+      handleResponse, 'anomaliesData'
+    )
   },
 
   resolveAnomaly: (id: number) =>
-    fetch(`${API_BASE}/anomalies/${id}/resolve`, {
-      method: 'POST', headers: getHeaders()
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/anomalies/${id}/resolve`, {
+        method: 'POST', headers: getHeaders()
+      }), handleResponse
+    ),
 
   getAnomalyTrend: () =>
-    fetch(`${API_BASE}/anomalies/trend`, 
-      {headers: getHeaders()}).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/anomalies/trend`, {headers: getHeaders()}),
+      handleResponse, 'anomalyTrendData'
+    ),
 
   // ALERTS
   getAlerts: (filters: Record<string, string> = {}) => {
     const params = new URLSearchParams(filters).toString()
-    return fetch(`${API_BASE}/alerts/?${params}`, 
-      {headers: getHeaders()}).then(handleResponse)
+    return withFallback(
+      fetch(`${API_BASE}/alerts/?${params}`, {headers: getHeaders()}),
+      handleResponse, 'alertsData'
+    )
   },
 
   getAlertSummary: () =>
-    fetch(`${API_BASE}/alerts/summary`, 
-      {headers: getHeaders()}).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/alerts/summary`, {headers: getHeaders()}),
+      handleResponse, 'alertSummaryData'
+    ),
 
   resolveAlert: (id: number) =>
-    fetch(`${API_BASE}/alerts/${id}/resolve`, {
-      method: 'POST', headers: getHeaders()
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/alerts/${id}/resolve`, {
+        method: 'POST', headers: getHeaders()
+      }), handleResponse
+    ),
 
   snoozeAlert: (id: number, hours: number) =>
-    fetch(`${API_BASE}/alerts/${id}/snooze`, {
-      method: 'POST', headers: getHeaders(),
-      body: JSON.stringify({hours})
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/alerts/${id}/snooze`, {
+        method: 'POST', headers: getHeaders(), body: JSON.stringify({hours})
+      }), handleResponse
+    ),
 
   getAlertSettings: () =>
-    fetch(`${API_BASE}/alerts/settings`, 
-      {headers: getHeaders()}).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/alerts/settings`, {headers: getHeaders()}),
+      handleResponse, 'alertSettingsData'
+    ),
 
   saveAlertSettings: (settings: object) =>
-    fetch(`${API_BASE}/alerts/settings`, {
-      method: 'POST', headers: getHeaders(),
-      body: JSON.stringify(settings)
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/alerts/settings`, {
+        method: 'POST', headers: getHeaders(), body: JSON.stringify(settings)
+      }), handleResponse
+    ),
 
   // OPTIMIZATIONS
   getOptimizations: () =>
-    fetch(`${API_BASE}/optimizations/`, 
-      {headers: getHeaders()}).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/optimizations/`, {headers: getHeaders()}),
+      handleResponse, 'optimizationsData'
+    ),
 
   getOptimizationSummary: () =>
-    fetch(`${API_BASE}/optimizations/summary`, 
-      {headers: getHeaders()}).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/optimizations/summary`, {headers: getHeaders()}),
+      handleResponse, 'optimizationSummaryData'
+    ),
 
   // NOTIFICATIONS
   getNotifications: () =>
-    fetch(`${API_BASE}/notifications/`, 
-      {headers: getHeaders()}).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/notifications/`, {headers: getHeaders()}),
+      handleResponse, 'notificationsData'
+    ),
 
   markRead: (id: number) =>
-    fetch(`${API_BASE}/notifications/${id}/read`, {
-      method: 'POST', headers: getHeaders()
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/notifications/${id}/read`, {
+        method: 'POST', headers: getHeaders()
+      }), handleResponse
+    ),
 
   markAllRead: () =>
-    fetch(`${API_BASE}/notifications/read-all`, {
-      method: 'POST', headers: getHeaders()
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/notifications/read-all`, {
+        method: 'POST', headers: getHeaders()
+      }), handleResponse
+    ),
 
   // TRIGGERS
   getTriggers: () =>
-    fetch(`${API_BASE}/triggers/`, 
-      {headers: getHeaders()}).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/triggers/`, {headers: getHeaders()}),
+      handleResponse, 'triggersData'
+    ),
 
   saveTriggers: (rules: object) =>
-    fetch(`${API_BASE}/triggers/save`, {
-      method: 'POST', headers: getHeaders(),
-      body: JSON.stringify(rules)
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/triggers/save`, {
+        method: 'POST', headers: getHeaders(), body: JSON.stringify(rules)
+      }), handleResponse
+    ),
 
-  // AI — ALL REAL GROQ/GEMINI API CALLS
+  // AI
   getAIInsights: (costContext: object) =>
-    fetch(`${API_BASE}/ai/insight`, {
-      method: 'POST', headers: getHeaders(),
-      body: JSON.stringify(costContext)
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/ai/insight`, {
+        method: 'POST', headers: getHeaders(), body: JSON.stringify(costContext)
+      }), handleResponse, 'aiInsightsData'
+    ),
 
   analyzeAnomaly: (anomalyData: object) =>
-    fetch(`${API_BASE}/ai/analyze-anomaly`, {
-      method: 'POST', headers: getHeaders(),
-      body: JSON.stringify(anomalyData)
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/ai/analyze-anomaly`, {
+        method: 'POST', headers: getHeaders(), body: JSON.stringify(anomalyData)
+      }), handleResponse, 'aiAnalyzeAnomalyData'
+    ),
 
   chatWithAI: (message: string, history: any[], context: object) =>
-    fetch(`${API_BASE}/ai/chat`, {
-      method: 'POST', headers: getHeaders(),
-      body: JSON.stringify({
-        message, history, costContext: context
-      })
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/ai/chat`, {
+        method: 'POST', headers: getHeaders(), 
+        body: JSON.stringify({message, history, costContext: context})
+      }), handleResponse, 'aiChatData'
+    ),
 
   getReportSummary: (data: object) =>
-    fetch(`${API_BASE}/ai/generate-report-summary`, {
-      method: 'POST', headers: getHeaders(),
-      body: JSON.stringify({
-        selectedSections: [], costData: data
-      })
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/ai/generate-report-summary`, {
+        method: 'POST', headers: getHeaders(),
+        body: JSON.stringify({selectedSections: [], costData: data})
+      }), handleResponse, 'aiReportSummaryData'
+    ),
 
   getOptimizeSuggestion: (data: object) =>
-    fetch(`${API_BASE}/ai/optimize`, {
-      method: 'POST', headers: getHeaders(),
-      body: JSON.stringify(data)
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/ai/optimize`, {
+        method: 'POST', headers: getHeaders(), body: JSON.stringify(data)
+      }), handleResponse, 'optimizeSuggestionData'
+    ),
 
-  // EMAIL & PDF
+  // EMAIL
   sendReport: (payload: object) =>
-    fetch(`${API_BASE}/email/send-report`, {
-      method: 'POST', headers: getHeaders(),
-      body: JSON.stringify(payload)
-    }).then(handleResponse),
+    withFallback(
+      fetch(`${API_BASE}/email/send-report`, {
+        method: 'POST', headers: getHeaders(), body: JSON.stringify(payload)
+      }), handleResponse
+    )
 }
